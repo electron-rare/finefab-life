@@ -1,28 +1,46 @@
 # finefab-life
 
-Repository d'integration runtime FineFab (compose, operations, CI/CD, cockpit).
+Integration runtime for the FineFab platform -- Docker Compose stack, CI/CD pipelines, and operational tooling.
 
-## Role
-- Assembler les services FineFab pour execution locale/ops.
-- Heberger les definitions d'environnements et d'orchestration.
-- Centraliser runbooks et outils d'exploitation.
+Part of the [FineFab](https://github.com/L-electron-Rare) platform (Factory 4 Life).
 
-## Stack
-- Docker
-- Shell
-- CI/CD
+## What it does
 
-## Structure cible
-- `docker-compose.yml`: topologie locale
-- `ops/` et `scripts/`: operations, runbooks, automatisation
-- `.github/workflows/`: pipelines d'integration
+- Orchestrates all FineFab services into a single Docker Compose topology
+- Manages CI/CD pipelines for cross-repo builds and releases
+- Provides runbooks, health checks, and observability dashboards
+- Handles environment configuration for local dev, staging, and production
 
-## Demarrage rapide
+## Tech stack
+
+Docker Compose | GitHub Actions | Shell | Prometheus/Grafana
+
+## Quick start
+
 ```bash
+git clone git@github.com:L-electron-Rare/finefab-life.git
+cd finefab-life
 docker compose up -d
 ```
 
-## Roadmap immediate
-- Stabiliser stack d'observabilite.
-- Standardiser procedures de run/rollback.
-- Brancher pipelines de release inter-repos.
+## Project structure
+
+```
+docker-compose.yml       Service topology
+ops/                     Runbooks and operational scripts
+scripts/                 Automation and deployment helpers
+.github/workflows/       CI/CD pipeline definitions
+```
+
+## Related repos
+
+| Repo | Role |
+|------|------|
+| [makelife-cad](https://github.com/L-electron-Rare/makelife-cad) | CAD/EDA web platform |
+| [makelife-hard](https://github.com/L-electron-Rare/makelife-hard) | Hardware design (KiCad) |
+| [makelife-firmware](https://github.com/L-electron-Rare/makelife-firmware) | Embedded firmware |
+| [KIKI-models-tuning](https://github.com/L-electron-Rare/KIKI-models-tuning) | Model fine-tuning pipeline |
+
+## License
+
+MIT
