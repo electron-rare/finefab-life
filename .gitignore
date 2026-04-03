@@ -85,3 +85,10 @@ npm-debug.log*
 tmp/
 temp/
 *.tmp
+
+# Additional local caches
+.ruff_cache/
+.hypothesis/
+.tox/
+.ipynb_checkpoints/
+.pnpm-store/
