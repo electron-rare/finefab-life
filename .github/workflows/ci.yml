@@ -1,8 +1,47 @@
 name: CI
 on: [push, pull_request]
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      - run: echo "TODO: specialize CI for this repo"
+
+      - name: Validate docker-compose syntax
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Check markdown links (local paths)
+        run: |
+          python3 <<'PY'
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          root = Path('.')
+          md_files = [p for p in root.rglob('*.md') if '.git' not in p.parts]
+          errors = []
+
+          for md in md_files:
+            text = md.read_text(encoding='utf-8', errors='ignore')
+            for _, target in re.findall(r'\[([^\]]*)\]\(([^)]+)\)', text):
+              link = target.strip()
+              if not link or link.startswith(('http://', 'https://', '#', 'mailto:')):
+                continue
+
+              path_part = link.split('#', 1)[0]
+              if not path_part:
+                continue
+
+              resolved = (md.parent / path_part).resolve()
+              if not resolved.exists():
+                errors.append(f"{md}: broken link -> {link}")
+
+          if errors:
+            print('\n'.join(errors), file=sys.stderr)
+            sys.exit(1)
+          PY
+
+      - name: Run baseline tests
+        run: python3 -m unittest discover -s tests -v
