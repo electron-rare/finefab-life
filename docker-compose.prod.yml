@@ -1,165 +1,356 @@
 services:
   traefik:
-    image: traefik:v3.0
+    image: traefik:3
     container_name: traefik
-    restart: unless-stopped
     ports:
-      - "${TRAEFIK_BIND_IP:-127.0.0.1}:80:80"
-      - "${TRAEFIK_BIND_IP:-127.0.0.1}:443:443"
-    command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--api.dashboard=true"
-      - "--ping=true"
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:8080"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "traefik_letsencrypt:/letsencrypt"
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../traefik/traefik.yml:/traefik.yml:ro
+      - traefik-acme:/acme
+      - ../traefik/dynamic:/etc/traefik/dynamic:ro
+    restart: unless-stopped
     networks:
-      - public
+      - traefik
+
+  life-core:
+    build: ../life-core
+    container_name: life-core
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+      - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:11436}
+      - VLLM_MODELS=${VLLM_MODELS:-openai/qwen-27b-awq}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11435}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - ALLOWED_ORIGINS=https://life.saillant.cc,https://api.saillant.cc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=life-core
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=http://langfuse:3000
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "--max-time", "15", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 15s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - life-internal
+
+  life-reborn:
+    build: ../life-reborn
+    container_name: life-reborn
+    environment:
+      - CORE_URL=http://life-core:8000
+      - LIFE_REBORN_API_TOKEN=${LIFE_REBORN_API_TOKEN:-}
+      - ALLOWED_ORIGINS=https://life.saillant.cc
+      - PORT=3210
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=life-reborn
+    depends_on:
+      life-core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3210/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=${TRAEFIK_DASHBOARD_HOST_RULE:-Host(`traefik.local`)}"
-      - "traefik.http.routers.traefik.service=api@internal"
+      - traefik.enable=true
+      - traefik.http.routers.life-api.rule=Host(`api.saillant.cc`)
+      - traefik.http.routers.life-api.entrypoints=websecure
+      - traefik.http.routers.life-api.tls.certresolver=letsencrypt
+      - traefik.http.services.life-api.loadbalancer.server.port=3210
+    restart: unless-stopped
+    networks:
+      - life-internal
+      - traefik
+
+  life-web:
+    build:
+      context: ../life-web
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.saillant.cc}
+    container_name: life-web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.life-web.rule=Host(`life.saillant.cc`)
+      - traefik.http.routers.life-web.entrypoints=websecure
+      - traefik.http.routers.life-web.tls.certresolver=letsencrypt
+      - traefik.http.services.life-web.loadbalancer.server.port=80
+      - "traefik.http.routers.life-web.middlewares=oidc-auth@docker"
+    restart: unless-stopped
+    networks:
+      - traefik
 
   redis:
     image: redis:7-alpine
     container_name: redis
-    restart: unless-stopped
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
     networks:
-      - internal
+      - life-internal
 
   qdrant:
-    image: qdrant/qdrant:v1.9.2
+    image: qdrant/qdrant:latest
     container_name: qdrant
-    restart: unless-stopped
     volumes:
-      - "qdrant_data:/qdrant/storage"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:6333/healthz >/dev/null 2>&1"]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-    networks:
-      - internal
-
-  life-core:
-    build:
-      context: ../life-core
-      dockerfile: Dockerfile
-    image: finefab/life-core:prod
-    container_name: life-core
+      - qdrant-data:/qdrant/storage
     restart: unless-stopped
+    networks:
+      - life-internal
+
+  forgejo:
+    image: gitea/gitea:latest
+    container_name: forgejo
     environment:
-      - REDIS_URL=${REDIS_URL}
-      - OLLAMA_URL=${OLLAMA_URL}
-      - VLLM_BASE_URL=${VLLM_BASE_URL}
-      - VLLM_MODELS=${VLLM_MODELS}
-      - LANGFUSE_HOST=${LANGFUSE_HOST}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
-      - OTEL_SERVICE_NAME=life-core
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-      - QDRANT_URL=${QDRANT_URL}
-    depends_on:
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O - http://localhost:8000/health >/dev/null 2>&1"]
-      interval: 20s
-      timeout: 5s
-      retries: 10
-    networks:
-      - internal
-
-  life-reborn:
-    build:
-      context: ../life-reborn
-      dockerfile: Dockerfile
-    image: finefab/life-reborn:prod
-    container_name: life-reborn
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__server__ROOT_URL=https://git.saillant.cc
+      - GITEA__server__SSH_DOMAIN=git.saillant.cc
+      - GITEA__mirror__ENABLED=true
+      - GITEA__mirror__DEFAULT_INTERVAL=1h
+    volumes:
+      - forgejo-data:/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.forgejo.rule=Host(`git.saillant.cc`)
+      - traefik.http.routers.forgejo.entrypoints=websecure
+      - traefik.http.routers.forgejo.tls.certresolver=letsencrypt
+      - traefik.http.services.forgejo.loadbalancer.server.port=3000
     restart: unless-stopped
+    networks:
+      - life-internal
+      - traefik
+
+  makelife-cad:
+    build: ../makelife-cad
+    container_name: makelife-cad
     environment:
-      - PORT=3210
-      - LIFE_CORE_URL=${LIFE_CORE_URL}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
-      - OTEL_SERVICE_NAME=life-reborn
-      - API_BEARER_TOKEN=${API_BEARER_TOKEN}
-    depends_on:
-      life-core:
-        condition: service_healthy
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_SERVICE_NAME: makelife-cad
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=finefab-life_public"
-      - "traefik.http.routers.api.rule=${TRAEFIK_API_HOST_RULE:-Host(`api.saillant.cc`)}"
-      - "traefik.http.routers.api.entrypoints=websecure"
-      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.api.loadbalancer.server.port=3210"
-    networks:
-      - internal
-      - public
-
-  life-web:
-    build:
-      context: ../life-web
-      dockerfile: Dockerfile
-    image: finefab/life-web:prod
-    container_name: life-web
+      - traefik.enable=true
+      - traefik.http.routers.cad.rule=Host(`cad.saillant.cc`)
+      - traefik.http.routers.cad.entrypoints=websecure
+      - traefik.http.routers.cad.tls.certresolver=letsencrypt
+      - traefik.http.services.cad.loadbalancer.server.port=8001
     restart: unless-stopped
-    depends_on:
-      life-reborn:
-        condition: service_started
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=finefab-life_public"
-      - "traefik.http.routers.web.rule=${TRAEFIK_WEB_HOST_RULE:-Host(`life.saillant.cc`)}"
-      - "traefik.http.routers.web.entrypoints=websecure"
-      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
-      - "traefik.http.services.web.loadbalancer.server.port=80"
     networks:
-      - public
+      - life-internal
+      - traefik
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ../otel/config.yaml:/etc/otelcol/config.yaml:ro
+    restart: unless-stopped
+    networks:
+      - life-internal
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.jaeger.rule=Host(`jaeger.saillant.cc`)
+      - traefik.http.routers.jaeger.entrypoints=websecure
+      - traefik.http.routers.jaeger.tls.certresolver=letsencrypt
+      - traefik.http.services.jaeger.loadbalancer.server.port=16686
+      - "traefik.http.routers.jaeger.middlewares=oidc-auth@docker"
+    restart: unless-stopped
+    networks:
+      - life-internal
+      - traefik
+
+  langfuse-postgres:
+    image: postgres:16-alpine
+    container_name: langfuse-postgres
+    environment:
+      - POSTGRES_USER=langfuse
+      - POSTGRES_PASSWORD=${LANGFUSE_POSTGRES_PASSWORD:-changeme}
+      - POSTGRES_DB=langfuse
+    volumes:
+      - langfuse-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - life-internal
 
   langfuse:
     image: langfuse/langfuse:2
     container_name: langfuse
-    restart: unless-stopped
     environment:
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - DATABASE_URL=postgresql://langfuse:${LANGFUSE_POSTGRES_PASSWORD:-changeme}@langfuse-postgres:5432/langfuse
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-changeme}
       - NEXTAUTH_URL=https://langfuse.saillant.cc
-      - NEXTAUTH_SECRET=${LANGFUSE_SECRET_KEY}
+      - SALT=${LANGFUSE_SALT:-changeme}
+      - TELEMETRY_ENABLED=false
+      - HOSTNAME=0.0.0.0
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.langfuse.rule=Host(`langfuse.saillant.cc`)
+      - traefik.http.routers.langfuse.entrypoints=websecure
+      - traefik.http.routers.langfuse.tls.certresolver=letsencrypt
+      - traefik.http.services.langfuse.loadbalancer.server.port=3000
+      - "traefik.http.routers.langfuse.middlewares=oidc-auth@docker"
+    restart: unless-stopped
+    networks:
+      - life-internal
+      - traefik
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_HTTP_ADDR=0.0.0.0
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grafana.rule=Host(`grafana.saillant.cc`)
+      - traefik.http.routers.grafana.entrypoints=websecure
+      - traefik.http.routers.grafana.tls.certresolver=letsencrypt
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+      - "traefik.http.routers.grafana.middlewares=oidc-auth@docker"
+    restart: unless-stopped
+    networks:
+      - life-internal
+      - traefik
+
+  vllm-kxkm-proxy:
+    image: alpine/socat:latest
+    container_name: vllm-kxkm-proxy
+    command: TCP-LISTEN:11436,fork,reuseaddr TCP:100.87.54.119:8000
+    network_mode: host
+    restart: unless-stopped
+
+  ollama-cils-proxy:
+    image: alpine/socat:latest
+    container_name: ollama-cils-proxy
+    command: TCP-LISTEN:11435,fork,reuseaddr TCP:100.126.225.111:11434
+    network_mode: host
+    restart: unless-stopped
+
+  traefik-forward-auth:
+    image: thomseddon/traefik-forward-auth:2
+    container_name: traefik-forward-auth
+    environment:
+      PROVIDERS_OIDC_ISSUER_URL: https://auth.saillant.cc/realms/electro_life
+      PROVIDERS_OIDC_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-life-reborn}
+      PROVIDERS_OIDC_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}
+      DEFAULT_PROVIDER: oidc
+      SECRET: ${FORWARD_AUTH_SECRET:-random-secret-change-me}
+      AUTH_HOST: auth-gate.saillant.cc
+      COOKIE_DOMAIN: saillant.cc
+      LOG_LEVEL: info
+    networks:
+      - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=finefab-life_public"
-      - "traefik.http.routers.langfuse.rule=${TRAEFIK_LANGFUSE_HOST_RULE:-Host(`langfuse.saillant.cc`)}"
-      - "traefik.http.routers.langfuse.entrypoints=websecure"
-      - "traefik.http.routers.langfuse.tls.certresolver=letsencrypt"
-      - "traefik.http.services.langfuse.loadbalancer.server.port=3000"
+      - "traefik.http.routers.auth-gate.rule=Host(`auth-gate.saillant.cc`)"
+      - "traefik.http.routers.auth-gate.entrypoints=websecure"
+      - "traefik.http.routers.auth-gate.tls.certresolver=letsencrypt"
+      - "traefik.http.services.auth-gate.loadbalancer.server.port=4181"
+      - "traefik.http.middlewares.oidc-auth.forwardauth.address=http://traefik-forward-auth:4181"
+      - "traefik.http.middlewares.oidc-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+      - "traefik.http.middlewares.oidc-auth.forwardauth.trustForwardHeader=true"
+    restart: unless-stopped
+
+  keycloak-postgres:
+    image: postgres:16-alpine
+    container_name: keycloak-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-secret-2026}
+    volumes:
+      - keycloak-pg-data:/var/lib/postgresql/data
     networks:
-      - internal
-      - public
+      - life-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak
+    command: start
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak-secret-2026}
+      KC_HOSTNAME: auth.saillant.cc
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin-secret-2026}
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    networks:
+      - life-internal
+    restart: unless-stopped
 
 networks:
-  public:
-    name: finefab-life_public
-  internal:
-    name: finefab-life_internal
+  life-internal:
+    driver: bridge
+  traefik:
+    name: traefik
+    driver: bridge
 
 volumes:
-  qdrant_data:
-  traefik_letsencrypt:
+  traefik-acme:
+  redis-data:
+  qdrant-data:
+  forgejo-data:
+  langfuse-pg-data:
+  grafana-data:
+  keycloak-pg-data:
