@@ -1,0 +1,165 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "${TRAEFIK_BIND_IP:-127.0.0.1}:80:80"
+      - "${TRAEFIK_BIND_IP:-127.0.0.1}:443:443"
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--api.dashboard=true"
+      - "--ping=true"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik_letsencrypt:/letsencrypt"
+    networks:
+      - public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=${TRAEFIK_DASHBOARD_HOST_RULE:-Host(`traefik.local`)}"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - internal
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.2
+    container_name: qdrant
+    restart: unless-stopped
+    volumes:
+      - "qdrant_data:/qdrant/storage"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:6333/healthz >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    networks:
+      - internal
+
+  life-core:
+    build:
+      context: ../life-core
+      dockerfile: Dockerfile
+    image: finefab/life-core:prod
+    container_name: life-core
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - OLLAMA_URL=${OLLAMA_URL}
+      - VLLM_BASE_URL=${VLLM_BASE_URL}
+      - VLLM_MODELS=${VLLM_MODELS}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+      - OTEL_SERVICE_NAME=life-core
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - QDRANT_URL=${QDRANT_URL}
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8000/health >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  life-reborn:
+    build:
+      context: ../life-reborn
+      dockerfile: Dockerfile
+    image: finefab/life-reborn:prod
+    container_name: life-reborn
+    restart: unless-stopped
+    environment:
+      - PORT=3210
+      - LIFE_CORE_URL=${LIFE_CORE_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}
+      - OTEL_SERVICE_NAME=life-reborn
+      - API_BEARER_TOKEN=${API_BEARER_TOKEN}
+    depends_on:
+      life-core:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=finefab-life_public"
+      - "traefik.http.routers.api.rule=${TRAEFIK_API_HOST_RULE:-Host(`api.saillant.cc`)}"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=3210"
+    networks:
+      - internal
+      - public
+
+  life-web:
+    build:
+      context: ../life-web
+      dockerfile: Dockerfile
+    image: finefab/life-web:prod
+    container_name: life-web
+    restart: unless-stopped
+    depends_on:
+      life-reborn:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=finefab-life_public"
+      - "traefik.http.routers.web.rule=${TRAEFIK_WEB_HOST_RULE:-Host(`life.saillant.cc`)}"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.web.loadbalancer.server.port=80"
+    networks:
+      - public
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: langfuse
+    restart: unless-stopped
+    environment:
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - NEXTAUTH_URL=https://langfuse.saillant.cc
+      - NEXTAUTH_SECRET=${LANGFUSE_SECRET_KEY}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=finefab-life_public"
+      - "traefik.http.routers.langfuse.rule=${TRAEFIK_LANGFUSE_HOST_RULE:-Host(`langfuse.saillant.cc`)}"
+      - "traefik.http.routers.langfuse.entrypoints=websecure"
+      - "traefik.http.routers.langfuse.tls.certresolver=letsencrypt"
+      - "traefik.http.services.langfuse.loadbalancer.server.port=3000"
+    networks:
+      - internal
+      - public
+
+networks:
+  public:
+    name: finefab-life_public
+  internal:
+    name: finefab-life_internal
+
+volumes:
+  qdrant_data:
+  traefik_letsencrypt:
