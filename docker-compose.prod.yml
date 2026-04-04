@@ -287,8 +287,8 @@ services:
       PROVIDERS_OIDC_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}
       DEFAULT_PROVIDER: oidc
       SECRET: ${FORWARD_AUTH_SECRET:-random-secret-change-me}
-      AUTH_HOST: auth-gate.saillant.cc
       COOKIE_DOMAIN: saillant.cc
+      URL_PATH: /_oauth
       LOG_LEVEL: debug
     networks:
       - traefik
