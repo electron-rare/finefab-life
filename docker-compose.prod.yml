@@ -11,6 +11,9 @@ services:
       - ../traefik/traefik.yml:/traefik.yml:ro
       - traefik-acme:/acme
       - ../traefik/dynamic:/etc/traefik/dynamic:ro
+    environment:
+      - CF_API_EMAIL=${CLOUDFLARE_AUTH_EMAIL:-}
+      - CF_API_KEY=${CLOUDFLARE_API_KEY:-}
     restart: unless-stopped
     networks:
       - traefik

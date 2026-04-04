@@ -124,6 +124,7 @@ docker compose \
 
 - `--env-file` passé **deux fois** : `.env` (credentials locaux) + `saillant-shared.env` (secrets Tower partagés, source de vérité = Infisical). Sans `--env-file`, Compose ne charge plus `.env` automatiquement.
 - `--build` obligatoire si code modifié.
+- Traefik lit aussi les credentials Cloudflare depuis ces env-files pour le `dnsChallenge` ACME. Ne pas revenir au `httpChallenge` derrière Cloudflare.
 
 Rebuild un seul service :
 ```bash
@@ -134,7 +135,7 @@ docker compose --env-file .env --env-file /home/clems/.secrets/saillant-shared.e
 ## Réseaux et proxies
 
 - `life-internal` : communication inter-services (life-core, life-reborn, redis, qdrant, otel-collector, jaeger, langfuse, makelife-cad, forgejo)
-- `traefik` : routage public via le Traefik **local** de ce stack (Let's Encrypt, pas celui de photon)
+- `traefik` : routage public via le Traefik **local** de ce stack (Let's Encrypt en `dnsChallenge` Cloudflare, pas celui de photon)
 - life-reborn → life-core : `CORE_URL=http://life-core:8000`
 - `vllm-kxkm-proxy` (socat) : TCP :11436 → KXKM-AI:8000 (vLLM, mode host)
 - `ollama-cils-proxy` (socat) : TCP :11435 → Cils:11434 (Ollama, mode host)
