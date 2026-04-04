@@ -300,6 +300,7 @@ services:
       - "traefik.http.services.auth-gate.loadbalancer.server.port=4181"
       - "traefik.http.middlewares.oidc-auth.forwardauth.address=http://traefik-forward-auth:4181"
       - "traefik.http.middlewares.oidc-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
+      - "traefik.http.middlewares.oidc-auth.forwardauth.authRequestHeaders=X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Host,X-Forwarded-Uri,X-Forwarded-Method"
       - "traefik.http.middlewares.oidc-auth.forwardauth.trustForwardHeader=true"
     restart: unless-stopped
 
