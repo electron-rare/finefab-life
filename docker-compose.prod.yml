@@ -96,7 +96,8 @@ services:
       - traefik.http.routers.life-web.entrypoints=websecure
       - traefik.http.routers.life-web.tls.certresolver=letsencrypt
       - traefik.http.services.life-web.loadbalancer.server.port=80
-      - "traefik.http.routers.life-web.middlewares=oidc-auth@docker"
+      # Auth handled by oidc-client-ts in life-web (no forward-auth needed)
+      # - "traefik.http.routers.life-web.middlewares=oidc-auth@docker"
     restart: unless-stopped
     networks:
       - traefik
