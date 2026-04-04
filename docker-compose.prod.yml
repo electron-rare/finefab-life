@@ -8,9 +8,9 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ../traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
       - traefik-acme:/acme
-      - ../traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
     environment:
       - CF_API_EMAIL=${CLOUDFLARE_AUTH_EMAIL:-}
       - CF_API_KEY=${CLOUDFLARE_API_KEY:-}
@@ -19,20 +19,23 @@ services:
       - traefik
 
   life-core:
-    build: ../life-core
+    build: ./life-core
     container_name: life-core
     environment:
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
+      - BROWSER_RUNNER_URL=http://browser-runner:8010
+      - BROWSER_ALLOWED_HOSTS=${BROWSER_ALLOWED_HOSTS:-life.saillant.cc,test.saillant.cc,api.saillant.cc,langfuse.saillant.cc,jaeger.saillant.cc,grafana.saillant.cc,docs.langfuse.com,platform.openai.com,huggingface.co,qdrant.tech}
       - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:11436}
       - VLLM_MODELS=${VLLM_MODELS:-openai/qwen-27b-awq}
       - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11435}
+      - OLLAMA_EMBED_URL=${OLLAMA_EMBED_URL:-http://host.docker.internal:11434}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - ALLOWED_ORIGINS=https://life.saillant.cc,https://api.saillant.cc
+      - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc,https://api.saillant.cc
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=life-core
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
@@ -55,13 +58,31 @@ services:
     networks:
       - life-internal
 
+  browser-runner:
+    build: ./life-core
+    container_name: browser-runner
+    command: ["uvicorn", "life_core.browser_runner_api:app", "--host", "0.0.0.0", "--port", "8010"]
+    environment:
+      - BROWSER_ENGINE=${BROWSER_RUNNER_ENGINE:-http}
+      - BROWSER_ENABLE_HTTP_FALLBACK=true
+      - BROWSER_ALLOWED_HOSTS=${BROWSER_ALLOWED_HOSTS:-life.saillant.cc,test.saillant.cc,api.saillant.cc,langfuse.saillant.cc,jaeger.saillant.cc,grafana.saillant.cc,docs.langfuse.com,platform.openai.com,huggingface.co,qdrant.tech}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "--max-time", "15", "http://localhost:8010/health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - life-internal
+
   life-reborn:
-    build: ../life-reborn
+    build: ./life-reborn
     container_name: life-reborn
     environment:
       - CORE_URL=http://life-core:8000
       - LIFE_REBORN_API_TOKEN=${LIFE_REBORN_API_TOKEN:-}
-      - ALLOWED_ORIGINS=https://life.saillant.cc
+      - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc
       - PORT=3210
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=life-reborn
@@ -86,7 +107,7 @@ services:
 
   life-web:
     build:
-      context: ../life-web
+      context: ./life-web
       args:
         VITE_API_URL: ${VITE_API_URL:-https://api.saillant.cc}
     container_name: life-web
@@ -96,8 +117,14 @@ services:
       - traefik.http.routers.life-web.entrypoints=websecure
       - traefik.http.routers.life-web.tls.certresolver=letsencrypt
       - traefik.http.services.life-web.loadbalancer.server.port=80
-      # Auth handled by oidc-client-ts in life-web (no forward-auth needed)
-      # - "traefik.http.routers.life-web.middlewares=oidc-auth@docker"
+      - "traefik.http.routers.life-web.middlewares=oidc-auth@docker"
+      - traefik.http.routers.life-web-test.rule=Host(`test.saillant.cc`)
+      - traefik.http.routers.life-web-test.entrypoints=websecure
+      - traefik.http.routers.life-web-test.tls.certresolver=letsencrypt
+      - traefik.http.routers.life-web-test.service=life-web
+      - traefik.http.routers.life-web-test-http.rule=Host(`test.saillant.cc`)
+      - traefik.http.routers.life-web-test-http.entrypoints=web
+      - traefik.http.routers.life-web-test-http.service=life-web
     restart: unless-stopped
     networks:
       - traefik
@@ -149,7 +176,7 @@ services:
       - traefik
 
   makelife-cad:
-    build: ../makelife-cad
+    build: ./makelife-cad
     container_name: makelife-cad
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -176,7 +203,7 @@ services:
     container_name: otel-collector
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
-      - ../otel/config.yaml:/etc/otelcol/config.yaml:ro
+      - ./otel/config.yaml:/etc/otelcol/config.yaml:ro
     restart: unless-stopped
     networks:
       - life-internal
@@ -251,8 +278,8 @@ services:
       - GF_SERVER_HTTP_ADDR=0.0.0.0
     volumes:
       - grafana-data:/var/lib/grafana
-      - ../grafana/provisioning:/etc/grafana/provisioning:ro
-      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     labels:
       - traefik.enable=true
       - traefik.http.routers.grafana.rule=Host(`grafana.saillant.cc`)
@@ -284,12 +311,14 @@ services:
     container_name: traefik-forward-auth
     environment:
       PROVIDERS_OIDC_ISSUER_URL: https://auth.saillant.cc/realms/electron_rare
-      PROVIDERS_OIDC_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-oauth2-proxy}
-      PROVIDERS_OIDC_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-changeme}
+      PROVIDERS_OIDC_CLIENT_ID: oauth2-proxy
+      PROVIDERS_OIDC_CLIENT_SECRET: ${ER_OAUTH2_PROXY_CLIENT_SECRET:-changeme}
       DEFAULT_PROVIDER: oidc
       SECRET: ${FORWARD_AUTH_SECRET:-random-secret-change-me}
+      AUTH_HOST: auth-gate.saillant.cc
       COOKIE_DOMAIN: saillant.cc
-      LOG_LEVEL: debug
+      INSECURE_COOKIE: "true"
+      LOG_LEVEL: info
     networks:
       - traefik
     labels:
@@ -300,7 +329,6 @@ services:
       - "traefik.http.services.auth-gate.loadbalancer.server.port=4181"
       - "traefik.http.middlewares.oidc-auth.forwardauth.address=http://traefik-forward-auth:4181"
       - "traefik.http.middlewares.oidc-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
-      - "traefik.http.middlewares.oidc-auth.forwardauth.authRequestHeaders=X-Forwarded-For,X-Forwarded-Proto,X-Forwarded-Host,X-Forwarded-Uri,X-Forwarded-Method"
       - "traefik.http.middlewares.oidc-auth.forwardauth.trustForwardHeader=true"
     restart: unless-stopped
 
