@@ -27,7 +27,7 @@ services:
       - BROWSER_RUNNER_URL=http://browser-runner:8010
       - BROWSER_ALLOWED_HOSTS=${BROWSER_ALLOWED_HOSTS:-life.saillant.cc,test.saillant.cc,api.saillant.cc,langfuse.saillant.cc,jaeger.saillant.cc,grafana.saillant.cc,docs.langfuse.com,platform.openai.com,huggingface.co,qdrant.tech}
       - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:11436}
-      - VLLM_MODELS=${VLLM_MODELS:-openai/qwen-27b-awq}
+      - VLLM_MODELS=${VLLM_MODELS:-openai/qwen-14b-awq}
       - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11435}
       - OLLAMA_EMBED_URL=${OLLAMA_EMBED_URL:-http://host.docker.internal:11434}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -35,7 +35,7 @@ services:
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc,https://api.saillant.cc
+      - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc,https://api.saillant.cc,https://rag.saillant.cc
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=life-core
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
@@ -82,7 +82,7 @@ services:
     environment:
       - CORE_URL=http://life-core:8000
       - LIFE_REBORN_API_TOKEN=${LIFE_REBORN_API_TOKEN:-}
-      - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc
+      - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc,https://rag.saillant.cc
       - PORT=3210
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=life-reborn
@@ -129,6 +129,19 @@ services:
     networks:
       - traefik
 
+  rag-web:
+    build: ./rag-web
+    container_name: rag-web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.rag-web.rule=Host(`rag.saillant.cc`)
+      - traefik.http.routers.rag-web.entrypoints=websecure
+      - traefik.http.routers.rag-web.tls.certresolver=letsencrypt
+      - traefik.http.services.rag-web.loadbalancer.server.port=80
+    networks:
+      - traefik
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -148,6 +161,8 @@ services:
     container_name: qdrant
     volumes:
       - qdrant-data:/qdrant/storage
+    ports:
+      - "127.0.0.1:6333:6333"
     restart: unless-stopped
     networks:
       - life-internal
