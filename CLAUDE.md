@@ -26,10 +26,12 @@ life-web (React/nginx :80)
   → life-reborn (Hono :3210)
     → life-core (FastAPI :8000)
        ↕  qdrant :6333 (exposé 127.0.0.1)  redis :6379  langfuse :3000
-       ↕  ollama (Tower, embeddings nomic-embed-text + résumés qwen3:4b)
-       ↕  vLLM qwen-14b-awq (KXKM-AI RTX 4090) via SSH tunnel port 11436
+       ↕  llama.cpp qwen-3b-tower (Tower P2000 GPU, port 11438)
+       ↕  vLLM qwen-14b-awq (KXKM-AI RTX 4090) via tunnel port 11436
+       ↕  TEI nomic-embed-text (KXKM-AI CPU) via tunnel port 11437
 rag-web (React/nginx :80) → life-reborn /api/search, /api/alerts
 makelife-cad (FastAPI :8001)  — accès direct depuis life-core
+browser-runner (FastAPI :8010) — headless browser, web scraping
 forgejo  jaeger  grafana  langfuse  otel-collector  traefik-forward-auth  keycloak
 ```
 
@@ -37,8 +39,12 @@ forgejo  jaeger  grafana  langfuse  otel-collector  traefik-forward-auth  keyclo
 
 - `life-internal` — communication inter-services (tous sauf life-web, rag-web)
 - `traefik` — routage public via Traefik **local** (Let's Encrypt dnsChallenge Cloudflare)
-- **SSH tunnel** `kxkm-ai-tunnel.service` (systemd, persistant) : Tower → photon → KXKM-AI, port 11436. Remplace les anciens socat containers.
-- life-core atteint vLLM via `host.docker.internal:11436`, Ollama local via `OLLAMA_URL` (embeddings) et `OLLAMA_EMBED_URL` (séparé si besoin)
+- **SSH tunnel** `kxkm-ai-tunnel.service` (systemd user, persistant) : Tower → photon → KXKM-AI, 3 forwards :
+  - `11436` → KXKM-AI:8000 (vLLM qwen-14b-awq, GPU)
+  - `11437` → KXKM-AI:8001 (TEI nomic-embed-text, CPU)
+  - `8889` → KXKM-AI:8889 (SearXNG)
+- **llama.cpp local** : `llm-tower` container Docker, port 11438, Qwen2.5-3B Q4 sur P2000
+- life-core atteint vLLM via `host.docker.internal:11436`, embeddings TEI via `host.docker.internal:11437`, LLM local via `host.docker.internal:11438`
 
 ## Domaines publics
 
@@ -54,6 +60,30 @@ forgejo  jaeger  grafana  langfuse  otel-collector  traefik-forward-auth  keyclo
 | `grafana.saillant.cc` | grafana | `oidc-auth@docker` |
 
 `oidc-auth@docker` = `traefik-forward-auth` → Keycloak realm `electron_rare`.
+
+## Authentification
+
+Deux mécanismes d'auth coexistent — ne pas les confondre :
+
+| Service | Mécanisme | Realm | Client ID |
+|---------|-----------|-------|-----------|
+| `life-web` | Client-side OIDC (`oidc-client-ts`, PKCE) | `electro_life` | `life-web` |
+| `rag-web` | Client-side Keycloak JS | `electron_rare` | `rag-web` |
+| `life-reborn` | JWT Bearer validation (middleware Hono) | `electro_life` | — (introspection) |
+| langfuse, jaeger, grafana | `traefik-forward-auth` (`oidc-auth@docker`) | `electron_rare` | `oauth2-proxy` |
+
+Flux OIDC life-web : `life-web` → `electro_life` → broker IDP → `electron_rare` (login) → retour avec token.
+
+Config auth life-web : `life-web/src/lib/auth.ts`. Variables `VITE_KEYCLOAK_REALM` et `VITE_KEYCLOAK_CLIENT_ID` (compilées au build).
+
+Keycloak realms gérés dans `suite-numerique/keycloak/*.json`. Scripts de sync dans `suite-numerique/scripts/`.
+
+## Scripts ops
+
+```bash
+bash scripts/deploy_prod.sh              # déploiement production orchestré
+bash scripts/bootstrap_keycloak_local.sh  # provisioning Keycloak local (realm electro_life)
+```
 
 ## Déploiement production
 
@@ -81,6 +111,7 @@ Sans `--env-file`, Compose ne charge plus `.env` automatiquement depuis Compose 
 - **life-reborn** attend `life-core: service_healthy` (start_period 15s, LiteLLM lent).
 - **Keycloak local** — ce stack a son propre Keycloak (`keycloak-postgres` + `keycloak`) distinct du Keycloak partagé de mascarade. Realm : `electro_life`.
 - **Ne pas modifier** `life-reborn/src/generated/*` à la main — régénérer via `npm run openapi:generate && npm run client:generate`.
+- **Auth : ne pas mélanger forward-auth et client-side** — `life-web` utilise `oidc-client-ts` (pas de middleware Traefik). Ajouter `oidc-auth@docker` à life-web crée un double auth qui casse le flux OIDC.
 
 ## Repos GitHub L-electron-Rare
 

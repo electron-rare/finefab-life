@@ -28,8 +28,9 @@ services:
       - BROWSER_ALLOWED_HOSTS=${BROWSER_ALLOWED_HOSTS:-life.saillant.cc,test.saillant.cc,api.saillant.cc,langfuse.saillant.cc,jaeger.saillant.cc,grafana.saillant.cc,docs.langfuse.com,platform.openai.com,huggingface.co,qdrant.tech}
       - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:11436}
       - VLLM_MODELS=${VLLM_MODELS:-openai/qwen-14b-awq}
-      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11435}
-      - OLLAMA_EMBED_URL=${OLLAMA_EMBED_URL:-http://host.docker.internal:11434}
+      - LOCAL_LLM_URL=${LOCAL_LLM_URL:-http://host.docker.internal:11438}
+      - LOCAL_LLM_MODELS=${LOCAL_LLM_MODELS:-openai/qwen-3b-tower}
+      - EMBED_URL=${EMBED_URL:-http://host.docker.internal:11437}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
@@ -89,6 +90,8 @@ services:
       - PORT=3210
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=life-reborn
+      - KEYCLOAK_JWKS_URL=https://auth.saillant.cc/realms/electro_life/protocol/openid-connect/certs
+      - KEYCLOAK_ISSUER=https://auth.saillant.cc/realms/electro_life
     depends_on:
       life-core:
         condition: service_healthy
@@ -120,7 +123,6 @@ services:
       - traefik.http.routers.life-web.entrypoints=websecure
       - traefik.http.routers.life-web.tls.certresolver=letsencrypt
       - traefik.http.services.life-web.loadbalancer.server.port=80
-      - "traefik.http.routers.life-web.middlewares=oidc-auth@docker"
       - traefik.http.routers.life-web-test.rule=Host(`test.saillant.cc`)
       - traefik.http.routers.life-web-test.entrypoints=websecure
       - traefik.http.routers.life-web-test.tls.certresolver=letsencrypt
