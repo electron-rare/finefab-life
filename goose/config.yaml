@@ -1,0 +1,28 @@
+# Goose config for FineFab platform
+# Placed at /home/goose/.config/goose/config.yaml inside the container.
+# Provider and model are set via env vars GOOSE_PROVIDER / GOOSE_MODEL
+# (or ANTHROPIC_API_KEY / OPENAI_API_KEY at runtime).
+
+extensions:
+  developer:
+    enabled: true
+    builtin:
+      name: developer
+      display_name: Developer Tools
+      timeout: 300
+
+  finefab-core:
+    enabled: true
+    streamable_http:
+      name: finefab-core
+      display_name: FineFab Platform (RAG, Chat, Monitoring, Activepieces)
+      uri: "http://life-core:8000/mcp"
+      timeout: 120
+
+  finefab-cad:
+    enabled: true
+    streamable_http:
+      name: finefab-cad
+      display_name: FineFab CAD (KiCad DRC/BOM)
+      uri: "http://makelife-cad:8001/mcp"
+      timeout: 60
