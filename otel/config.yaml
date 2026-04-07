@@ -20,13 +20,20 @@ receivers:
               labels:
                 machine: photon
             - targets:
-                - 192.168.0.119:9201
+                - host.docker.internal:11440
               labels:
                 machine: kxkm-ai
             - targets:
                 - 192.168.0.119:9202
               labels:
                 machine: cils
+        - job_name: nvidia-gpu
+          scrape_interval: 30s
+          static_configs:
+            - targets:
+                - host.docker.internal:11441
+              labels:
+                machine: kxkm-ai
 
 processors:
   batch:
