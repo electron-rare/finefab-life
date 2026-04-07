@@ -39,10 +39,10 @@ services:
       - GOOSE_PROVIDER=anthropic
       - GOOSE_MODEL=claude-sonnet-4-20250514
       - GRAFANA_URL=http://grafana:3000
-      - GRAFANA_API_KEY=glsa_x7SEMn4fQnD2nKoOElpiyd0w8kgvfmhP_ccf7a547
+      - GRAFANA_API_KEY=${GRAFANA_API_KEY:-}
       - PROMETHEUS_URL=http://otel-collector:8889
       - ACTIVEPIECES_URL=https://auto.saillant.cc
-      - ACTIVEPIECES_TOKEN=NgmPRJsskkmskrKzHKyPKmvxUaoxhR3oxUr4C4lO8DvpKID0cUPeo1RrC5QWOPXF6p6wp1Gv
+      - ACTIVEPIECES_TOKEN=${ACTIVEPIECES_TOKEN:-}
       - ACTIVEPIECES_PROJECT_ID=${ACTIVEPIECES_PROJECT_ID:-QG09trLP4ICBvpCbyjVRw}
       - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc,https://api.saillant.cc,https://rag.saillant.cc
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -63,6 +63,10 @@ services:
       timeout: 20s
       retries: 3
       start_period: 15s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    group_add:
+      - "984"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -226,12 +230,27 @@ services:
       - life-internal
       - traefik
 
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /:/host:ro,rslave
+    pid: host
+    restart: unless-stopped
+    networks:
+      - life-internal
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otel/config.yaml:/etc/otelcol/config.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     networks:
       - life-internal
