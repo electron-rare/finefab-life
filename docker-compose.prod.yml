@@ -376,6 +376,36 @@ services:
       - life-internal
     restart: unless-stopped
 
+  goosed:
+    build:
+      context: ./goose
+      dockerfile: Dockerfile
+    container_name: goosed
+    restart: unless-stopped
+    ports:
+      - "3300:3000"
+    environment:
+      - GOOSE_PROVIDER=${GOOSE_PROVIDER:-anthropic}
+      - GOOSE_MODEL=${GOOSE_MODEL:-claude-sonnet-4-20250514}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOSE_HOST=0.0.0.0
+      - GOOSE_PORT=3000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.goosed.rule=Host(`goose.saillant.cc`)
+      - traefik.http.routers.goosed.entrypoints=websecure
+      - traefik.http.routers.goosed.tls.certresolver=letsencrypt
+      - traefik.http.services.goosed.loadbalancer.server.port=3000
+      - "traefik.http.routers.goosed.middlewares=oidc-auth@docker"
+    networks:
+      - life-internal
+      - traefik
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - life-core
+
 networks:
   life-internal:
     driver: bridge
