@@ -26,3 +26,13 @@ extensions:
       display_name: FineFab CAD (KiCad DRC/BOM)
       uri: "http://makelife-cad:8001/mcp"
       timeout: 60
+
+  activepieces:
+    enabled: true
+    streamable_http:
+      name: activepieces
+      display_name: Activepieces Automation
+      uri: "https://auto.saillant.cc/api/v1/projects/QG09trLP4ICBvpCbyjVRw/mcp-server/http"
+      headers:
+        Authorization: "Bearer NgmPRJsskkmskrKzHKyPKmvxUaoxhR3oxUr4C4lO8DvpKID0cUPeo1RrC5QWOPXF6p6wp1Gv"
+      timeout: 60
