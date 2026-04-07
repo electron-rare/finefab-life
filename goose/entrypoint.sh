@@ -12,10 +12,10 @@ echo "Bind     : ${GOOSE_HOST:-0.0.0.0}:${GOOSE_PORT:-3000}"
 export GOOSE_HOST="${GOOSE_HOST:-0.0.0.0}"
 export GOOSE_PORT="${GOOSE_PORT:-3000}"
 
-if command -v goosed &>/dev/null; then
-    exec goosed agent
+if command -v goose &>/dev/null; then
+    exec goose agent
 else
-    echo "ERROR: goosed binary not found in PATH"
+    echo "ERROR: goose binary not found in PATH"
     echo "Binaries available:"
     ls /usr/local/bin/ 2>&1 || true
     exit 1

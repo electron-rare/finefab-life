@@ -9,10 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git libssl3 libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Download prebuilt binary (x86_64 Linux) — tarball contains 'goosed'
+# Download prebuilt binary (x86_64 Linux) — tarball contains 'goose'
 RUN curl -fsSL "https://github.com/block/goose/releases/download/${GOOSE_VERSION}/goose-x86_64-unknown-linux-gnu.tar.bz2" \
-    | tar xj -C /usr/local/bin/ \
-    && chmod +x /usr/local/bin/goosed
+    | tar xj --strip-components=0 -C /usr/local/bin/ \
+    && chmod +x /usr/local/bin/goose
 
 RUN useradd -m -u 1000 goose
 USER goose
