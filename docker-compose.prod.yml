@@ -205,7 +205,7 @@ services:
       start_period: 10s
     labels:
       - traefik.enable=true
-      - traefik.http.routers.cad.rule=Host(`cad.saillant.cc`)
+      - "traefik.http.routers.cad.rule=Host(`cad.saillant.cc`) || Host(`eda.saillant.cc`)"
       - traefik.http.routers.cad.entrypoints=websecure
       - traefik.http.routers.cad.tls.certresolver=letsencrypt
       - traefik.http.services.cad.loadbalancer.server.port=8001
