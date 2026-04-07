@@ -6,7 +6,7 @@ FROM debian:bookworm-slim
 ARG GOOSE_VERSION=v1.29.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git bzip2 libssl3 libdbus-1-3 \
+    ca-certificates curl git bzip2 libssl3 libdbus-1-3 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Download prebuilt binary (x86_64 Linux) — tarball contains 'goose'
