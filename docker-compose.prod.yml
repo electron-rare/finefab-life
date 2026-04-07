@@ -35,6 +35,8 @@ services:
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GOOSE_PROVIDER=anthropic
+      - GOOSE_MODEL=claude-sonnet-4-20250514
       - ALLOWED_ORIGINS=https://life.saillant.cc,https://test.saillant.cc,https://api.saillant.cc,https://rag.saillant.cc
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=life-core
