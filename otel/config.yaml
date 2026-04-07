@@ -24,7 +24,7 @@ receivers:
               labels:
                 machine: kxkm-ai
             - targets:
-                - 192.168.0.119:9202
+                - 192.168.0.210:9100
               labels:
                 machine: cils
         - job_name: nvidia-gpu
