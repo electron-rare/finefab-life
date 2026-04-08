@@ -33,6 +33,5 @@ extensions:
       name: activepieces
       display_name: Activepieces Automation
       uri: "https://auto.saillant.cc/api/v1/projects/QG09trLP4ICBvpCbyjVRw/mcp-server/http"
-      headers:
-        Authorization: "Bearer NgmPRJsskkmskrKzHKyPKmvxUaoxhR3oxUr4C4lO8DvpKID0cUPeo1RrC5QWOPXF6p6wp1Gv"
+      # Auth token set at runtime via ACTIVEPIECES_MCP_TOKEN env var
       timeout: 60
