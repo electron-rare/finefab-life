@@ -1,0 +1,25 @@
+# OS & System
+.DS_Store
+
+# Node / JavaScript
+node_modules/
+
+# Build & Cache
+dist/
+.vite/
+.cache/
+
+# TypeScript build info and compiled config outputs
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+tailwind.config.d.ts
+tailwind.config.js
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
