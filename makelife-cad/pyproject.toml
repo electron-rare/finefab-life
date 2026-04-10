@@ -1,0 +1,33 @@
+[project]
+name = "makelife-cad"
+version = "0.1.0"
+description = "CAD/EDA gateway for the FineFab ecosystem"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.34,<1",
+    "pydantic>=2.12,<3",
+    "httpx>=0.28,<1",
+    "python-multipart>=0.0.20,<1",
+    "opentelemetry-api>=1.33,<2",
+    "opentelemetry-sdk>=1.33,<2",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.33,<2",
+    "opentelemetry-instrumentation-fastapi>=0.50b0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9", "pytest-cov>=5,<6",
+    "pytest-asyncio>=0.24,<1",
+    "httpx>=0.28,<1",
+]
+
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["gateway"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=gateway --cov-fail-under=70"
