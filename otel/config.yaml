@@ -38,6 +38,15 @@ receivers:
                 - host.docker.internal:11441
               labels:
                 machine: kxkm-ai
+        - job_name: vllm
+          scrape_interval: 15s
+          metrics_path: /metrics
+          static_configs:
+            - targets:
+                - host.docker.internal:11436
+              labels:
+                machine: kxkm-ai
+                service: vllm
 
 processors:
   batch:

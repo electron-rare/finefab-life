@@ -27,7 +27,7 @@ services:
       - BROWSER_RUNNER_URL=http://browser-runner:8010
       - BROWSER_ALLOWED_HOSTS=${BROWSER_ALLOWED_HOSTS:-life.saillant.cc,test.saillant.cc,api.saillant.cc,langfuse.saillant.cc,jaeger.saillant.cc,grafana.saillant.cc,docs.langfuse.com,platform.openai.com,huggingface.co,qdrant.tech}
       - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:11436}
-      - VLLM_MODELS=${VLLM_MODELS:-openai/qwen-14b-awq}
+      - VLLM_MODELS=${VLLM_MODELS:-openai/qwen-32b-awq}
       - LOCAL_LLM_URL=${LOCAL_LLM_URL:-http://host.docker.internal:11438}
       - LOCAL_LLM_MODELS=${LOCAL_LLM_MODELS:-openai/qwen-3b-tower}
       - EMBED_URL=${EMBED_URL:-http://host.docker.internal:11437}
