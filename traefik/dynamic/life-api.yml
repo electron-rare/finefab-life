@@ -1,0 +1,14 @@
+http:
+  routers:
+    life-api:
+      rule: "Host(`api.saillant.cc`)"
+      entrypoints:
+        - websecure
+      service: life-api
+      tls:
+        certResolver: letsencrypt
+  services:
+    life-api:
+      loadBalancer:
+        servers:
+          - url: "http://life-reborn:3210"

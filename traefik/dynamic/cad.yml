@@ -1,0 +1,15 @@
+http:
+  routers:
+    makelife-cad:
+      rule: "Host(`cad.saillant.cc`)"
+      entrypoints:
+        - websecure
+      service: makelife-cad-svc
+      tls:
+        certResolver: letsencrypt
+      priority: 100
+  services:
+    makelife-cad-svc:
+      loadBalancer:
+        servers:
+          - url: "http://makelife-cad:8001"

@@ -1,0 +1,14 @@
+http:
+  routers:
+    life-web:
+      rule: "Host(`life.saillant.cc`)"
+      entrypoints:
+        - websecure
+      service: life-web
+      tls:
+        certResolver: letsencrypt
+  services:
+    life-web:
+      loadBalancer:
+        servers:
+          - url: "http://life-web:80"
