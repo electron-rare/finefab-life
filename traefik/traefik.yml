@@ -1,0 +1,43 @@
+api:
+  dashboard: true
+  insecure: true   # sûr : port 8080 bind sur 127.0.0.1 uniquement (docker-compose)
+
+log:
+  level: WARN
+
+accessLog:
+  filePath: /var/log/traefik/access.log
+  bufferingSize: 100
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: traefik
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: postmaster@saillant.cc
+      storage: /acme/acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+
+# TLS certificates are issued through ACME DNS-01 via Cloudflare.

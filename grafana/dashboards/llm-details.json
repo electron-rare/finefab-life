@@ -1,0 +1,58 @@
+{
+  "dashboard": {
+    "title": "FineFab Life — LLM Details",
+    "uid": "finefab-llm",
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Calls by Provider (rate/5m)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {"expr": "sum by (provider) (rate(finefab_llm_calls_total[5m]))", "legendFormat": "{{provider}}"}
+        ]
+      },
+      {
+        "title": "Errors by Provider (rate/5m)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {"expr": "sum by (provider) (rate(finefab_llm_errors_total[5m]))", "legendFormat": "{{provider}}"}
+        ]
+      },
+      {
+        "title": "Latency P50 by Provider",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {"expr": "histogram_quantile(0.50, sum by (le, provider) (rate(finefab_llm_duration_ms_bucket[5m])))", "legendFormat": "P50 {{provider}}"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "ms"}}
+      },
+      {
+        "title": "Latency P99 by Provider",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {"expr": "histogram_quantile(0.99, sum by (le, provider) (rate(finefab_llm_duration_ms_bucket[5m])))", "legendFormat": "P99 {{provider}}"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "ms"}}
+      },
+      {
+        "title": "Token Usage by Model",
+        "type": "barchart",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {"expr": "sum by (model) (finefab_llm_calls_total)", "legendFormat": "{{model}}"}
+        ]
+      }
+    ],
+    "time": {"from": "now-1h", "to": "now"},
+    "refresh": "30s"
+  }
+}

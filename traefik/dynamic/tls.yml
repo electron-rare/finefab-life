@@ -1,0 +1,2 @@
+# ACME is configured in the static Traefik config.
+# This file is intentionally left without dynamic TLS objects.

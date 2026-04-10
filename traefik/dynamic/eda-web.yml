@@ -1,0 +1,14 @@
+http:
+  routers:
+    eda-web:
+      rule: "Host(`eda.saillant.cc`)"
+      entrypoints:
+        - websecure
+      service: eda-web
+      tls:
+        certResolver: letsencrypt
+  services:
+    eda-web:
+      loadBalancer:
+        servers:
+          - url: "http://eda-web:80"

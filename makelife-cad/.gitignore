@@ -32,8 +32,7 @@ dmypy.json
 .coverage
 htmlcov/
 *.egg-info/
-dist/
-build/
+*.egg
 .eggs/
 
 # Node / JavaScript
@@ -43,6 +42,7 @@ yarn-debug.log*
 yarn-error.log*
 .npm/
 .node_modules/
+*.tsbuildinfo
 
 # Package managers
 yarn.lock
@@ -51,6 +51,7 @@ package-lock.json
 
 # Build & Cache
 dist/
+dist-electron/
 .vite/
 .turbo/
 .next/
@@ -58,6 +59,9 @@ out/
 build/
 coverage/
 .cache/
+
+# kicad-bridge build output
+kicad-bridge/build/
 
 # Environment
 .env
@@ -101,12 +105,22 @@ terraform.tfstate*
 # Logs
 logs/
 *.log
-npm-debug.log*
 
 # Temporary
 tmp/
 temp/
 *.tmp
+
+# CAD vendor forks and local integrations
+vendor/
+
+# Xcode user data (not project files — those are committed)
+*.xcuserstate
+*.xcuserdata/
+DerivedData/
+
+# CI artifacts
+.ci_artifacts/
 
 # Additional local caches
 .ruff_cache/
@@ -114,16 +128,3 @@ temp/
 .tox/
 .ipynb_checkpoints/
 .pnpm-store/
-
-# oh-my-claude runtime state (sessions, plans, mission state)
-.omc/
-
-# Vendored copies of finefab-ui inside eda-web (artefact bootstrap)
-# Use the workspace-level package directly instead.
-eda-web/finefab-ui/
-eda-web/finefab-ui-local/
-
-# Vite build artifacts
-*.tsbuildinfo
-vite.config.d.ts
-vite.config.js
