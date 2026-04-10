@@ -1,0 +1,141 @@
+{
+  "dashboard": {
+    "title": "FineFab — Goose Agent",
+    "uid": "finefab-goose",
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "refresh": "30s",
+    "time": {"from": "now-1h", "to": "now"},
+    "panels": [
+      {
+        "id": 1,
+        "title": "RAG Retrievals Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "rate(finefab_rag_retrieval_count_total[5m])",
+            "legendFormat": "Retrievals/s"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {"drawStyle": "line", "fillOpacity": 10}
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "RAG Latency P50/P99",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "histogram_quantile(0.50, rate(finefab_rag_retrieval_latency_ms_bucket[5m]))",
+            "legendFormat": "P50"
+          },
+          {
+            "refId": "B",
+            "expr": "histogram_quantile(0.99, rate(finefab_rag_retrieval_latency_ms_bucket[5m]))",
+            "legendFormat": "P99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "custom": {"drawStyle": "line", "fillOpacity": 10}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "RAG Top Score",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "histogram_quantile(0.50, rate(finefab_rag_retrieval_top_score_bucket[5m]))",
+            "legendFormat": "Top Score P50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {"drawStyle": "line", "fillOpacity": 10}
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "LLM Calls by Provider",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum by (provider) (finefab_llm_calls_total)",
+            "legendFormat": "{{provider}}"
+          }
+        ],
+        "options": {"pieType": "donut"}
+      },
+      {
+        "id": 5,
+        "title": "LLM Error Rate %",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum(rate(finefab_llm_errors_total[5m])) / sum(rate(finefab_llm_calls_total[5m])) * 100",
+            "legendFormat": "Error Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "LLM Latency P50 by Provider",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 16, "x": 8, "y": 16},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "histogram_quantile(0.50, sum by (le, provider) (rate(finefab_llm_duration_ms_bucket[5m])))",
+            "legendFormat": "{{provider}} P50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "custom": {"drawStyle": "line", "fillOpacity": 10}
+          }
+        }
+      }
+    ]
+  }
+}
