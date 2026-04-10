@@ -114,3 +114,16 @@ temp/
 .tox/
 .ipynb_checkpoints/
 .pnpm-store/
+
+# oh-my-claude runtime state (sessions, plans, mission state)
+.omc/
+
+# Vendored copies of finefab-ui inside eda-web (artefact bootstrap)
+# Use the workspace-level package directly instead.
+eda-web/finefab-ui/
+eda-web/finefab-ui-local/
+
+# Vite build artifacts
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
