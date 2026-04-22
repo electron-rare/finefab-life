@@ -321,8 +321,19 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
-      - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_HTTP_ADDR=0.0.0.0
+      # Auto-provision via traefik-forward-auth: X-Forwarded-User contains
+      # the Keycloak email after the middleware validates the session.
+      # GF_USERS_ALLOW_SIGN_UP gates AUTO_SIGN_UP; whitelist restricts the
+      # auth_proxy header to the Docker bridge so nothing external spoofs it.
+      - GF_USERS_ALLOW_SIGN_UP=true
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=X-Forwarded-User
+      - GF_AUTH_PROXY_HEADER_PROPERTY=username
+      - GF_AUTH_PROXY_HEADERS=Email:X-Forwarded-User Name:X-Forwarded-User
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      - GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN=true
+      - GF_AUTH_PROXY_WHITELIST=172.0.0.0/8
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -362,6 +373,11 @@ services:
       - "traefik.http.routers.auth-gate.rule=Host(`auth-gate.saillant.cc`)"
       - "traefik.http.routers.auth-gate.entrypoints=websecure"
       - "traefik.http.routers.auth-gate.tls.certresolver=letsencrypt"
+      # Self-apply: /_oauth callbacks must traverse the oidc-auth middleware
+      # so X-Forwarded-Uri arrives populated. Without this, forward-auth's
+      # internal router sees an empty path, misroutes every callback to
+      # AuthHandler, and users loop without ever getting _forward_auth set.
+      - "traefik.http.routers.auth-gate.middlewares=oidc-auth@docker"
       - "traefik.http.services.auth-gate.loadbalancer.server.port=4181"
       - "traefik.http.middlewares.oidc-auth.forwardauth.address=http://traefik-forward-auth:4181"
       - "traefik.http.middlewares.oidc-auth.forwardauth.authResponseHeaders=X-Forwarded-User"
