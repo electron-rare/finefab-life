@@ -11,6 +11,15 @@ ARG VITE_CAD_URL=https://api.saillant.cc/eda
 ARG VITE_KEYCLOAK_URL=https://auth.saillant.cc
 ARG VITE_KEYCLOAK_REALM=electro_life
 ARG VITE_KEYCLOAK_CLIENT_ID=eda-web
+# Vite reads VITE_* from the build environment, not from Docker ARGs.
+# Without these ENV lines the defaults above never reach the bundle
+# and API calls resolve against relative paths that nginx serves as
+# index.html (SPA fallback — symptoms: "models unavailable", 401, etc.).
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_CAD_URL=$VITE_CAD_URL \
+    VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL \
+    VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM \
+    VITE_KEYCLOAK_CLIENT_ID=$VITE_KEYCLOAK_CLIENT_ID
 RUN pnpm run build
 
 FROM nginx:alpine
