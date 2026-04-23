@@ -24,6 +24,10 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6333
+      # V1.7 P-a (obs 13806): wildcard exposes full cluster inventory
+      # in /infra/containers. Unset or non-"*" falls back to the
+      # F4L_COMPOSE_PROJECT label filter (default: factory-4-life).
+      - F4L_CONTAINER_FILTER=${F4L_CONTAINER_FILTER:-*}
       - BROWSER_RUNNER_URL=http://browser-runner:8010
       - BROWSER_ALLOWED_HOSTS=${BROWSER_ALLOWED_HOSTS:-life.saillant.cc,test.saillant.cc,api.saillant.cc,langfuse.saillant.cc,jaeger.saillant.cc,grafana.saillant.cc,docs.langfuse.com,platform.openai.com,huggingface.co,qdrant.tech}
       - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:11436}
